@@ -1,4 +1,4 @@
-use axum::{routing::{get, post}, Router, extract::Path, Json};
+use axum::{routing::{get, post}, Router, extract::Path, Json, response::IntoResponse, http::StatusCode };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -71,7 +71,7 @@ async fn list_packets() -> Json<Vec<String>> {
 }
 
 // Get specific question by packet name and question index
-async fn get_question(Path((packet_name, question_index)): Path<(String, usize)>) -> Option<Json<Question>> {
+async fn get_question(Path((packet_name, question_index)): Path<(String, usize)>) -> impl IntoResponse {
     let packets = get_mock_packets();
 
     // Find the packet
@@ -79,11 +79,14 @@ async fn get_question(Path((packet_name, question_index)): Path<(String, usize)>
         // Ensure question index is valid
         if question_index < packet.questions.len() {
             let question = packet.questions[question_index].clone();
-            return Some(Json(question));
+            return (StatusCode::OK, Json(question));
         }
     }
 
-    None  // Return None if not found
+    (StatusCode::NOT_FOUND, Json(Question {
+        text: "Question not found".to_string(),
+        correct_answer: "none".to_string(),
+    }))  // Return None if not found
 }
 
 // Submit an answer for a question
@@ -91,7 +94,7 @@ async fn get_question(Path((packet_name, question_index)): Path<(String, usize)>
 struct AnswerPayload {
     answer: String,
 }
-
+/*
 async fn submit_answer(
     Path((packet_name, question_index)): Path<(String, usize)>,
     Json(payload): Json<AnswerPayload>,
@@ -121,13 +124,13 @@ async fn submit_answer(
 
     None  // Return None if not found
 }
-
+*/
 #[shuttle_runtime::main]
 async fn main() -> shuttle_axum::ShuttleAxum {
     let router = Router::new()
-        .route("/packets", get(list_packets))  // List all exercise packets
-        .route("/packet/:packet_name/questions/:question_index", get(get_question))  // Get specific question
-        .route("/packet/:packet_name/questions/:question_index/submit", post(submit_answer));  // Submit answer
+        .route("/packets", get(list_packets))
+        .route("/packet/:packet_name/questions/:question_index", get(get_question))
+        ; //.route("/packet/:packet_name/questions/:question_index/submit", post(submit_answer))
 
     Ok(router.into())
 }
