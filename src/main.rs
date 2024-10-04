@@ -5,7 +5,8 @@ use std::collections::HashMap;
 #[derive(Serialize, Deserialize, Clone)]
 struct Question {
     text: String,
-    correct_answer: String,
+    alternatives: Vec<String>,  // 4 possible answers
+    correct_answer_index: usize, // Index of the correct alternative (0-3)
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -24,7 +25,7 @@ struct SubmitResponse {
 fn get_mock_packets() -> HashMap<String, ExercisePacket> {
     let mut packets = HashMap::new();
 
-    // Packet 1
+    // Packet 1: Math with multiple-choice questions
     packets.insert(
         "math".to_string(),
         ExercisePacket {
@@ -32,17 +33,19 @@ fn get_mock_packets() -> HashMap<String, ExercisePacket> {
             questions: vec![
                 Question {
                     text: "What is 2 + 2?".to_string(),
-                    correct_answer: "4".to_string(),
+                    alternatives: vec!["3".to_string(), "4".to_string(), "5".to_string(), "6".to_string()],
+                    correct_answer_index: 1, // "4" is correct
                 },
                 Question {
                     text: "What is 3 * 3?".to_string(),
-                    correct_answer: "9".to_string(),
+                    alternatives: vec!["6".to_string(), "7".to_string(), "8".to_string(), "9".to_string()],
+                    correct_answer_index: 3, // "9" is correct
                 },
             ],
         },
     );
 
-    // Packet 2
+    // Packet 2: Science with multiple-choice questions
     packets.insert(
         "science".to_string(),
         ExercisePacket {
@@ -50,11 +53,13 @@ fn get_mock_packets() -> HashMap<String, ExercisePacket> {
             questions: vec![
                 Question {
                     text: "What planet is known as the Red Planet?".to_string(),
-                    correct_answer: "Mars".to_string(),
+                    alternatives: vec!["Earth".to_string(), "Mars".to_string(), "Jupiter".to_string(), "Venus".to_string()],
+                    correct_answer_index: 1, // "Mars" is correct
                 },
                 Question {
                     text: "What is the chemical symbol for water?".to_string(),
-                    correct_answer: "H2O".to_string(),
+                    alternatives: vec!["O2".to_string(), "CO2".to_string(), "H2O".to_string(), "N2".to_string()],
+                    correct_answer_index: 2, // "H2O" is correct
                 },
             ],
         },
@@ -70,7 +75,21 @@ async fn list_packets() -> Json<Vec<String>> {
     Json(packet_names)
 }
 
-// Get specific question by packet name and question index
+async fn get_packet(Path(packet_name): Path<String>) -> impl IntoResponse {
+    let packets = get_mock_packets();
+
+    // Find the packet
+    if let Some(packet) = packets.get(&packet_name) {
+        
+        return (StatusCode::OK, Json(packet.clone()));
+    }
+
+    (StatusCode::NOT_FOUND, Json(ExercisePacket {
+        name: "Packet not found".to_string(),
+        questions: vec![]
+    }))
+}
+
 async fn get_question(Path((packet_name, question_index)): Path<(String, usize)>) -> impl IntoResponse {
     let packets = get_mock_packets();
 
@@ -85,8 +104,9 @@ async fn get_question(Path((packet_name, question_index)): Path<(String, usize)>
 
     (StatusCode::NOT_FOUND, Json(Question {
         text: "Question not found".to_string(),
-        correct_answer: "none".to_string(),
-    }))  // Return None if not found
+        alternatives: vec!["".to_string(), "".to_string(), "".to_string(), "".to_string()],
+        correct_answer_index: 0,
+    }))
 }
 
 // Submit an answer for a question
@@ -129,6 +149,7 @@ async fn submit_answer(
 async fn main() -> shuttle_axum::ShuttleAxum {
     let router = Router::new()
         .route("/packets", get(list_packets))
+        .route("/packets/:packet_name", get(get_packet))
         .route("/packet/:packet_name/questions/:question_index", get(get_question))
         ; //.route("/packet/:packet_name/questions/:question_index/submit", post(submit_answer))
 
